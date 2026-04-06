@@ -301,6 +301,10 @@ def new_game():
         'words': words,
         'topic': topic
     })
+    
+@app.route('/health')
+def health():
+    return 'OK', 200
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
