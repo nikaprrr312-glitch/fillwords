@@ -132,13 +132,12 @@ def index():
     for word in words:
         word_positions[word] = find_word_positions(grid, word)
     
-    # Сохраняем также информацию о размещении слов
     session['grid'] = grid
     session['words'] = words
     session['topic'] = topic
     session['word_positions'] = word_positions
     session['found_words'] = []
-    session['locked_positions'] = {}  # Для хранения зафиксированных позиций найденных слов
+    session['locked_positions'] = {}
     
     return render_template('index.html', 
                          grid=grid, 
@@ -157,7 +156,6 @@ def check_word():
     if word in session.get('found_words', []):
         return jsonify({'correct': False, 'word': word, 'already_found': True})
     
-    # Получаем позиции слова
     saved_positions = session.get('word_positions', {}).get(word, [])
     
     if not saved_positions:
@@ -168,10 +166,9 @@ def check_word():
                 session['word_positions'][word] = saved_positions
                 session.modified = True
     
-    # Сохраняем позиции найденного слова в locked_positions
     if saved_positions:
         locked = session.get('locked_positions', {})
-        locked[word] = saved_positions[0]  # Сохраняем первую позицию
+        locked[word] = saved_positions[0]
         session['locked_positions'] = locked
     
     session['found_words'].append(word)
@@ -187,7 +184,6 @@ def check_word():
 
 @app.route('/smart_restart', methods=['POST'])
 def smart_restart():
-    """Умное перемешивание - сохраняет найденные слова на своих местах"""
     data = request.get_json()
     found_words = data.get('found_words', [])
     
@@ -201,10 +197,8 @@ def smart_restart():
     size = len(old_grid)
     russian_letters = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'
     
-    # Создаём новую сетку
     new_grid = [row[:] for row in old_grid]
     
-    # Отмечаем клетки, которые нужно сохранить (найденные слова)
     cells_to_keep = set()
     
     for word in found_words:
@@ -222,17 +216,14 @@ def smart_restart():
                 c = start[1] + i * delta_col
                 cells_to_keep.add((r, c))
     
-    # Собираем все свободные буквы (которые можно перемешать)
     free_letters = []
     for i in range(size):
         for j in range(size):
             if (i, j) not in cells_to_keep:
                 free_letters.append(new_grid[i][j])
     
-    # Перемешиваем
     random.shuffle(free_letters)
     
-    # Вставляем обратно
     letter_idx = 0
     for i in range(size):
         for j in range(size):
@@ -240,17 +231,13 @@ def smart_restart():
                 new_grid[i][j] = free_letters[letter_idx]
                 letter_idx += 1
     
-    # Обновляем сетку в сессии
     session['grid'] = new_grid
     
-    # Пересчитываем позиции только для ненайденных слов
     new_word_positions = {}
     for word in all_words:
         if word in found_words:
-            # Для найденных слов оставляем старые позиции
             new_word_positions[word] = [locked_positions.get(word, {})] if word in locked_positions else []
         else:
-            # Для ненайденных слов ищем заново
             new_word_positions[word] = find_word_positions(new_grid, word)
     
     session['word_positions'] = new_word_positions
@@ -259,22 +246,6 @@ def smart_restart():
         'grid': new_grid,
         'locked_words': found_words
     })
-
-@app.route('/restore_word_highlight', methods=['POST'])
-def restore_word_highlight():
-    """Восстанавливает подсветку найденных слов после перемешивания"""
-    data = request.get_json()
-    word = data.get('word', '').upper()
-    
-    locked_positions = session.get('locked_positions', {})
-    
-    if word in locked_positions:
-        return jsonify({
-            'word': word,
-            'position': locked_positions[word]
-        })
-    
-    return jsonify({'word': word, 'position': None})
 
 @app.route('/new_game')
 def new_game():
